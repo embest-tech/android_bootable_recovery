@@ -28,6 +28,10 @@
 #include "common.h"
 #include "make_ext4fs.h"
 
+#ifdef USE_UBIFS
+#include "ubi.h"
+#endif
+
 static int num_volumes = 0;
 static Volume* device_volumes = NULL;
 
@@ -177,7 +181,8 @@ int ensure_path_mounted(const char* path) {
         }
         return mtd_mount_partition(partition, v->mount_point, v->fs_type, 0);
     } else if (strcmp(v->fs_type, "ext4") == 0 ||
-               strcmp(v->fs_type, "vfat") == 0) {
+               strcmp(v->fs_type, "vfat") == 0 ||
+               strcmp(v->fs_type, "ubifs") == 0) {
         result = mount(v->device, v->mount_point, v->fs_type,
                        MS_NOATIME | MS_NODEV | MS_NODIRATIME, "");
         if (result == 0) return 0;
@@ -278,6 +283,18 @@ int format_volume(const char* volume) {
         }
         return 0;
     }
+#ifdef USE_UBIFS
+    if (strcmp(v->fs_type, "ubifs") == 0) {
+        int ret;
+        LOGW("formating by ubiVolumeFormat");
+        ret = ubiVolumeFormat(v->device);
+        if (ret != 0) {
+            LOGE("ubiVolumeFormat return error:%d", ret);
+            return -1;
+        }
+            return 0;
+    }
+#endif
 
     LOGE("format_volume: fs_type \"%s\" unsupported\n", v->fs_type);
     return -1;

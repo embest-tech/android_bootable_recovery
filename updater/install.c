@@ -42,10 +42,16 @@
 #include "make_ext4fs.h"
 #endif
 
+#ifdef USE_UBIFS
+#include "ubi.h"
+#endif
+
+
 // mount(fs_type, partition_type, location, mount_point)
 //
 //    fs_type="yaffs2" partition_type="MTD"     location=partition
 //    fs_type="ext4"   partition_type="EMMC"    location=device
+//    fs_type="ubifs"  partition_type="UBI"	location=device
 Value* MountFn(const char* name, State* state, int argc, Expr* argv[]) {
     char* result = NULL;
     if (argc != 4) {
@@ -196,6 +202,7 @@ done:
 //
 //    fs_type="yaffs2" partition_type="MTD"     location=partition fs_size=<bytes> mount_point=<location>
 //    fs_type="ext4"   partition_type="EMMC"    location=device    fs_size=<bytes> mount_point=<location>
+//    fs_type "ubifs"  partition_type="UBIFS"   location=device    fs_size=<bytes> mount_point=<localtion>
 //    if fs_size == 0, then make_ext4fs uses the entire partition.
 //    if fs_size > 0, that is the size to use
 //    if fs_size < 0, then reserve that many bytes at the end of the partition
@@ -270,6 +277,15 @@ Value* FormatFn(const char* name, State* state, int argc, Expr* argv[]) {
             goto done;
         }
         result = location;
+#endif
+
+#ifdef USE_UBIFS
+    } else if (strcmp(fs_type, "ubifs") == 0) {
+
+            if (ubiVolumeFormat(location) != 0)
+                    goto done;
+
+            result = location;
 #endif
     } else {
         fprintf(stderr, "%s: unsupported fs_type \"%s\" partition_type \"%s\"",

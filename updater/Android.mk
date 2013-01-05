@@ -76,6 +76,13 @@ $(inc) : $(inc_dep_file)
 $(call intermediates-dir-for,EXECUTABLES,updater)/updater.o : $(inc)
 LOCAL_C_INCLUDES += $(dir $(inc))
 
+ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
+    LOCAL_CFLAGS += -DUSE_UBIFS
+    LOCAL_C_INCLUDES += external/mtd-utils/new-utils/include/
+    LOCAL_STATIC_LIBRARIES += libubi
+    LOCAL_SRC_FILES += ../ubi.cpp
+endif
+
 inc :=
 inc_dep_file :=
 
