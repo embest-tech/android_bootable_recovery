@@ -50,18 +50,14 @@ LOCAL_STATIC_LIBRARIES := \
     libm \
     libc
 
-ifeq ($(TARGET_USERIMAGES_USE_EXT4), true)
-    LOCAL_CFLAGS += -DUSE_EXT4
-    LOCAL_C_INCLUDES += system/extras/ext4_utils
-    LOCAL_STATIC_LIBRARIES += libext4_utils_static libz
-endif
+LOCAL_CFLAGS += -DUSE_EXT4
+LOCAL_C_INCLUDES += system/extras/ext4_utils
+LOCAL_STATIC_LIBRARIES += libext4_utils_static libz
 
-ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
-    LOCAL_CFLAGS += -DUSE_UBIFS
-    LOCAL_C_INCLUDES += external/mtd-utils/new-utils/include/
-    LOCAL_STATIC_LIBRARIES += libubi
-    LOCAL_SRC_FILES += ubi.cpp
-endif
+LOCAL_CFLAGS += -DUSE_UBIFS
+LOCAL_C_INCLUDES += external/mtd-utils/new-utils/include/
+LOCAL_STATIC_LIBRARIES += libubi
+LOCAL_SRC_FILES += ubi.cpp
 
 ifeq ($(HAVE_SELINUX), true)
   LOCAL_C_INCLUDES += external/libselinux/include
