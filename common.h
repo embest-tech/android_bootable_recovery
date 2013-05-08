@@ -56,6 +56,10 @@ typedef struct {
                               // partition.  0 or negative number
                               // means to format all but the last
                               // (that much).
+    long long reserved;       // (ext4 partition only) when
+                              // formating, reserved size to use for the
+                              // partition. 0 or negative number
+                              // means no reservied space.
 } Volume;
 
 // fopen a file, mounting volumes and making parent dirs as necessary.

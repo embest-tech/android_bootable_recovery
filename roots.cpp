@@ -22,6 +22,11 @@
 #include <unistd.h>
 #include <ctype.h>
 
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+
+
 #include "mtdutils/mtdutils.h"
 #include "mtdutils/mounts.h"
 #include "roots.h"
@@ -44,6 +49,8 @@ static int parse_options(char* options, Volume* volume) {
 
         if (strncmp(option, "length=", 7) == 0) {
             volume->length = strtoll(option+7, NULL, 10);
+        } else if (strncmp(option, "reserved=", 9) == 0){
+            volume->reserved = strtoll(option+9, NULL, 10);
         } else {
             LOGE("bad option \"%s\"\n", option);
             return -1;
@@ -51,6 +58,38 @@ static int parse_options(char* options, Volume* volume) {
     }
     return 0;
 }
+
+static int get_block_device_size(const char *filename, s64 *block_size)
+{
+	int fd;
+	struct stat buf;
+	int ret;
+
+    *block_size = 0;
+	fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (fd < 0) {
+		return -1;
+	}
+
+	ret = fstat(fd, &buf);
+	if (ret)
+		return -1;
+
+	if (S_ISBLK(buf.st_mode)) {
+	    ret = ioctl(fd, BLKGETSIZE64, block_size);
+	    if (ret)
+		    return -1;
+    }
+
+	if (*block_size < 0) {
+		warn("Computed filesystem size less than 0");
+		*block_size = 0;
+	}
+
+	close(fd);
+	return 0;
+}
+
 
 void load_volume_table() {
     int alloc = 2;
@@ -106,6 +145,7 @@ void load_volume_table() {
                 device2 ? strdup(device2) : NULL;
 
             device_volumes[num_volumes].length = 0;
+            device_volumes[num_volumes].reserved = 0;
             if (parse_options(options, device_volumes + num_volumes) != 0) {
                 LOGE("skipping malformed recovery.fstab line: %s\n", original);
             } else {
@@ -276,6 +316,15 @@ int format_volume(const char* volume) {
     }
 
     if (strcmp(v->fs_type, "ext4") == 0) {
+        /* Adjust the lenght to make the reserved space in the device */
+        if ((v->reserved > 0) && (v->length == 0)){
+            if (get_block_device_size(v->device, &v->length) == 0) {
+                LOGW("Adjust ext4 volume from %lld to %lld\n",
+                        v->length, v->length - v->reserved);
+                v->length -= v->reserved;
+            }
+        }
+
         int result = make_ext4fs(v->device, v->length, volume, sehandle);
         if (result != 0) {
             LOGE("format_volume: make_extf4fs failed on %s\n", v->device);
