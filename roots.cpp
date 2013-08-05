@@ -22,6 +22,10 @@
 #include <unistd.h>
 #include <ctype.h>
 
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+
 #include <fs_mgr.h>
 #include "mtdutils/mtdutils.h"
 #include "mtdutils/mounts.h"
@@ -34,10 +38,44 @@ static struct fstab *fstab = NULL;
 #include "ubi.h"
 #endif
 
+#define KEY_IN_FOOTER  "footer"
+#define CRYPT_FOOTER_OFFSET (0x8000)
+
 static int num_volumes = 0;
 static Volume* device_volumes = NULL;
 
 extern struct selabel_handle *sehandle;
+
+static int get_block_device_size(const char *filename, long long *block_size)
+{
+    int fd;
+    struct stat buf;
+    int ret;
+
+    *block_size = 0;
+    fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        return -1;
+    }
+
+    ret = fstat(fd, &buf);
+    if (ret)
+        return -1;
+
+    if (S_ISBLK(buf.st_mode)) {
+        ret = ioctl(fd, BLKGETSIZE64, block_size);
+        if (ret)
+            return -1;
+    }
+
+    if (*block_size < 0) {
+        LOGE("Computed filesystem size less than 0");
+        *block_size = 0;
+    }
+
+    close(fd);
+    return 0;
+}
 
 void load_volume_table()
 {
@@ -198,6 +236,15 @@ int format_volume(const char* volume) {
     }
 
     if (strcmp(v->fs_type, "ext4") == 0) {
+        if (fs_mgr_is_encryptable(v) &&
+            (v->length == 0) &&
+            (v->key_loc != NULL) &&
+            !strcmp(v->key_loc, KEY_IN_FOOTER)) {
+            if (get_block_device_size(v->blk_device, &v->length) == 0) {
+                v->length -= CRYPT_FOOTER_OFFSET;
+            }
+        }
+
         int result = make_ext4fs(v->blk_device, v->length, volume, sehandle);
         if (result != 0) {
             LOGE("format_volume: make_extf4fs failed on %s\n", v->blk_device);
